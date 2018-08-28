@@ -1,11 +1,12 @@
-# Python
+# python
 __pycache__/
 *.py[cod]
-*.bat
 
 # folder
 .idea/
 data/
 log/
-result/
-models/
+results/
+
+# others
+*.bat
