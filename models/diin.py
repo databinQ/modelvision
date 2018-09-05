@@ -8,6 +8,7 @@ from keras.layers import Conv1D, GlobalMaxPooling1D
 from keras.layers import Input, Embedding, TimeDistributed
 
 from layers.dropout import DecayingDropout
+from layers.diin_layers import Encoding
 
 
 class DIINModel(Model):
@@ -133,8 +134,10 @@ class DIINModel(Model):
         hypothesis_embedding = Concatenate()(hypothesis_features)
         d = K.int_shape()[-1]
 
-        """Encoding Layer"""
+        """Encoding layer"""
+        premise_encoding = Encoding(name="premise_encoding")(premise_embedding)
+        hypothesis_encoding = Encoding(name="hypothesis_encoding")(hypothesis_embedding)
 
-
+        """Interaction layer"""
 
 
