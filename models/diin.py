@@ -4,11 +4,12 @@ from keras import backend as K
 from keras.engine import Model
 from keras.models import Sequential
 from keras.layers import Reshape, Concatenate
-from keras.layers import Conv1D, GlobalMaxPooling1D
-from keras.layers import Input, Embedding, TimeDistributed
+from keras.layers import Conv1D, Conv2D, GlobalMaxPooling1D
+from keras.layers import Input, Embedding, TimeDistributed, Dense
 
+from models.densenet import DenseNet
 from layers.dropout import DecayingDropout
-from layers.diin_layers import Encoding
+from layers.diin_layers import Encoding, Interaction
 
 
 class DIINModel(Model):
@@ -16,8 +17,9 @@ class DIINModel(Model):
                  train_word_embeddings=False, dropout_init_keep_rate=1.0, dropout_decay_interval=10000,
                  dropout_decay_rate=0.977, use_chars=False, chars_per_word=16, char_input_dim=100,
                  char_embedding_size=8, char_conv_filters=100, char_conv_kernel_size=5,
-                 use_syntactical_features=False, syntactical_feature_size=50,
-                 use_exact_match=False,
+                 use_syntactical_features=False, syntactical_feature_size=50, use_exact_match=False,
+                 first_scale_down_ratio=0.3, nb_dense_blocks=3, layers_per_dense_block=8, nb_labels=3,
+                 growth_rate=20, transition_scale_down_ratio=0.5,
                  inputs=None, outputs=None, name="DIIN"):
         """Densely Interactive Inference Network(DIIN)
 
@@ -42,7 +44,12 @@ class DIINModel(Model):
         :param char_conv_filters: filters of the kernel applied on character embeddings
         :param char_conv_kernel_size: size of the kernel applied on character embeddings
         :param syntactical_feature_size: size of the syntactical feature vector for each word
-
+        :param first_scale_down_ratio: scale ratio of map features as the input of first Densenet block
+        :param nb_dense_blocks: number of dense blocks in densenet
+        :param layers_per_dense_block: number of layers in one dense block
+        :param nb_labels: number of labels
+        :param growth_rate:growing rate in dense net
+        :param transition_scale_down_ratio: transition scale down ratio in dense net
         :param inputs: inputs of keras models
         :param outputs: outputs of keras models
         :param name: models name
@@ -132,12 +139,31 @@ class DIINModel(Model):
         # Concatenate all features
         premise_embedding = Concatenate()(premise_features)
         hypothesis_embedding = Concatenate()(hypothesis_features)
-        d = K.int_shape()[-1]
+        d = K.int_shape(premise_embedding)[-1]
 
         """Encoding layer"""
         premise_encoding = Encoding(name="premise_encoding")(premise_embedding)
         hypothesis_encoding = Encoding(name="hypothesis_encoding")(hypothesis_embedding)
 
         """Interaction layer"""
+        interaction = Interaction(name="interaction")([premise_encoding, hypothesis_encoding])
 
+        """Feature extraction layer"""
+        feature_extractor_input = Conv2D(filters=int(d * first_scale_down_ratio),
+                                         kernel_size=1,
+                                         activation=None,
+                                         name="bottleneck")(interaction)  # Bottleneck layer
+        feature_extractor = DenseNet(input_tensor=Input(shape=K.int_shape(feature_extractor_input)[1:]),
+                                     include_top=False,
+                                     nb_dense_block=nb_dense_blocks,
+                                     nb_layers_per_block=layers_per_dense_block,
+                                     growth_rate=growth_rate,
+                                     compression=transition_scale_down_ratio)(feature_extractor_input)
 
+        """Output layer"""
+        features = DecayingDropout(init_keep_rate=dropout_init_keep_rate,
+                                   decay_interval=dropout_decay_interval,
+                                   decay_rate=dropout_decay_rate,
+                                   name="features")(feature_extractor)
+        out = Dense(nb_labels, activation="softmax", name="output")(features)
+        super(DIINModel, self).__init__(inputs=inputs, outputs=out, name=name)

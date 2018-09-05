@@ -79,3 +79,36 @@ class Encoding(Layer):
 
         encoding = r * P + f * z    # (batch, p, d)
         return encoding             # (batch, p, d)
+
+
+class Interaction(Layer):
+    def call(self, inputs, **kwargs):
+        """
+        Perform element-wise multiplication for each row of premise and hypothesis.
+
+        For every i, j, betta(premise[i], premise[j]) = premise[i] * premise[j], and get the result tensor with shape
+        (batch, p, h, d).
+
+        Use broadcast to achieve the goal.
+        """
+
+        assert len(inputs) == 2, "Number of inputs must equals to 2"
+        premise, hypothesis = inputs
+
+        premise = K.expand_dims(premise, axis=2)            # (batch, p, 1, d)
+        hypothesis = K.expand_dims(hypothesis, axis=1)      # (batch, 1, h, d)
+        return premise * hypothesis
+
+    def compute_output_shape(self, input_shape):
+        premise_shape = input_shape[0]
+        hypothesis_shape = input_shape[1]
+
+        assert len(premise_shape) == len(hypothesis_shape) == 3
+        assert premise_shape[0] == hypothesis_shape[0]
+        assert premise_shape[2] == hypothesis_shape[2]
+
+        batch = premise_shape[0]
+        p = premise_shape[1]
+        h = hypothesis_shape[1]
+        d = hypothesis_shape[2]
+        return batch, p, h, d
