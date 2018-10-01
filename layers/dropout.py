@@ -43,7 +43,7 @@ class DecayingDropout(Layer):
 
         def dropped_inputs():
             self.add_update([K.update_add(self.iterations, [1])], inputs=inputs)
-            return K.dropout(inputs, 1 - keep_rate, noise_shape=noise_shape, seed=self.seed)
+            return K.dropout(inputs, 1 - keep_rate[0], noise_shape=noise_shape, seed=self.seed)
 
         # Perform differently on training and predicting
         return K.in_train_phase(dropped_inputs, inputs, training=training)

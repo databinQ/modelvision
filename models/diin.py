@@ -19,8 +19,7 @@ class DIINModel(Model):
                  char_embedding_size=8, char_conv_filters=100, char_conv_kernel_size=5,
                  use_syntactical_features=False, syntactical_feature_size=50, use_exact_match=False,
                  first_scale_down_ratio=0.3, nb_dense_blocks=3, layers_per_dense_block=8, nb_labels=3,
-                 growth_rate=20, transition_scale_down_ratio=0.5,
-                 inputs=None, outputs=None, name="DIIN"):
+                 growth_rate=20, transition_scale_down_ratio=0.5, inputs=None, outputs=None, name="DIIN"):
         """Densely Interactive Inference Network(DIIN)
 
         Model from paper `Natural Language Inference over Interaction Space`
