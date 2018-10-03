@@ -75,7 +75,7 @@ class DIINModel(Model):
 
             word_embedding = Embedding(input_dim=word_embedding_weights.shape[0],
                                        output_dim=word_embedding_weights.shape[1],
-                                       weights=word_embedding_weights,
+                                       weights=[word_embedding_weights],
                                        trainable=train_word_embeddings,
                                        name="word_embedding")
             premise_word_embedding = word_embedding(premise_word_input)

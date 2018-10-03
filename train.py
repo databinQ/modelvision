@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import os
+from collections import Iterable
 
 
 class NLITaskTrain(object):
@@ -16,5 +17,16 @@ class NLITaskTrain(object):
         """Train Methods"""
         self.optimizer = optimizer
 
-        if name is None:
-            
+        """Others"""
+        self.save_dir = save_dir
+        if self.save_dir is not None and not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
+
+    def train(self, batch_size=128, eval_interval=512, shuffle=True):
+        return
+
+    def train_multi_optimizer(self, batch_size=128, eval_interval=512, shuffle=True):
+        assert isinstance(self.optimizer, Iterable) is True
+        assert len(self.optimizer) > 1
+
+        return

@@ -7,7 +7,10 @@ from keras.engine import Model
 from keras.layers.merge import concatenate
 from keras.layers import Input, BatchNormalization, Dropout, Flatten, Dense
 from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
-from keras.applications.imagenet_utils import _obtain_input_shape
+# from keras.applications.imagenet_utils import _obtain_input_shape
+from keras.applications.imagenet_utils import imagenet_utils
+
+_obtain_input_shape = imagenet_utils._obtain_input_shape
 
 
 class DenseNet(Model):
