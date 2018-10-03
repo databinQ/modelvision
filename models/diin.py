@@ -136,8 +136,12 @@ class DIINModel(Model):
             hypothesis_features.append(hypothesis_exact_match)
 
         # Concatenate all features
-        premise_embedding = Concatenate()(premise_features)
-        hypothesis_embedding = Concatenate()(hypothesis_features)
+        if len(premise_features) > 1:
+            premise_embedding = Concatenate()(premise_features)
+            hypothesis_embedding = Concatenate()(hypothesis_features)
+        else:
+            premise_embedding = premise_features[0]
+            hypothesis_embedding = hypothesis_features[0]
         d = K.int_shape(premise_embedding)[-1]
 
         """Encoding layer"""
