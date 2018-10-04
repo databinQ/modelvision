@@ -18,6 +18,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     """Model parameters"""
     parser.add_argument("--data_dir", type=str, default=DATA_PATH + "paipaidai/")
+    parser.add_argument("--log_dir", type=str, default=DATA_PATH + "paipaidai/logs/")
     parser.add_argument("--save_dir", type=str, default=DATA_PATH + "paipaidai/models/")
     parser.add_argument("--use_word_embedding", action="store_true", default=True)
     parser.add_argument("--use_chars", action="store_false", default=False)
@@ -91,6 +92,7 @@ if __name__ == "__main__":
                         test_data=[test_premise, test_hypothesis],
                         dev_data=[dev_premise, dev_hypothesis, dev_label],
                         optimizer=[(adam, 3), (adagrad, 4), (sgd, 15)],
+                        log_dir=args.log_dir,
                         save_dir=args.save_dir)
 
     task.train_multi_optimizer(batch_size=args.batch_size,

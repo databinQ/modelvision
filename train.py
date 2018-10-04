@@ -1,7 +1,6 @@
 # coding: utf-8
 
 import os
-import random
 import numpy as np
 from collections import Iterable
 from utils.logger import base_logger as logger
@@ -33,7 +32,7 @@ class NLITaskTrain(object):
         self.log_dir = log_dir
         if self.log_dir is not None and not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir)
-            self.logger = TensorBoard(log_dir=self.log_dir)
+        self.logger = TensorBoard(log_dir=self.log_dir)
 
         self.save_dir = save_dir
         if self.save_dir is not None and not os.path.exists(self.save_dir):
