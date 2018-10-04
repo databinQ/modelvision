@@ -8,6 +8,7 @@ from train import NLITaskTrain
 from models.diin import DIINModel
 from optimizers.l2_optimizer import L2Optimizer
 from keras.optimizers import Adam, Adagrad, SGD
+from sklearn.model_selection import train_test_split
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -37,7 +38,8 @@ if __name__ == "__main__":
     parser.add_argument("--l2_ratio", type=float, default=9e-5)
     parser.add_argument("--l2_difference_ratio", type=float, default=1e-3)
     """Train parameters"""
-    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--dev_rate", type=float, default=0.2)
+    parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--eval_interval", type=int, default=1024)
     parser.add_argument("--shuffle", action="store_true", default=True)
 
@@ -81,10 +83,16 @@ if __name__ == "__main__":
                       transition_scale_down_ratio=args.transition_scale_down_ratio,
                       nb_labels=args.nb_labels,)
 
+    train_premise, dev_premise, train_hypothesis, dev_hypothesis, train_label, dev_label = train_test_split(
+        train_premise, train_hypothesis, train_label, test_size=args.dev_rate)
+
     task = NLITaskTrain(model=model,
-                        train_data=(train_premise, train_hypothesis, train_label),
-                        test_data=(test_premise, test_hypothesis),
+                        train_data=[train_premise, train_hypothesis, train_label],
+                        test_data=[test_premise, test_hypothesis],
+                        dev_data=[dev_premise, dev_hypothesis, dev_label],
                         optimizer=[(adam, 3), (adagrad, 4), (sgd, 15)],
                         save_dir=args.save_dir)
 
-    task.train_multi_optimizer(batch_size=args.batch_size, eval_interval=args.eval_interval, shuffle=args.shuffle)
+    task.train_multi_optimizer(batch_size=args.batch_size,
+                               eval_interval=len(train_label) // args.batch_size,
+                               shuffle=args.shuffle)

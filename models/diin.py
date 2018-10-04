@@ -168,5 +168,8 @@ class DIINModel(Model):
                                    decay_interval=dropout_decay_interval,
                                    decay_rate=dropout_decay_rate,
                                    name="features")(feature_extractor)
-        out = Dense(nb_labels, activation="softmax", name="output")(features)
+        if nb_labels == 2:
+            out = Dense(1, activation="sigmoid", name="output")(features)
+        else:
+            out = Dense(nb_labels, activation="softmax", name="output")(features)
         super(DIINModel, self).__init__(inputs=inputs, outputs=out, name=name)
