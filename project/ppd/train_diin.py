@@ -40,7 +40,7 @@ if __name__ == "__main__":
     parser.add_argument("--l2_difference_ratio", type=float, default=1e-3)
     """Train parameters"""
     parser.add_argument("--dev_rate", type=float, default=0.2)
-    parser.add_argument("--batch_size", type=int, default=256)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--eval_interval", type=int, default=1024)
     parser.add_argument("--shuffle", action="store_true", default=True)
 

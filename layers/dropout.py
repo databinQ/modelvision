@@ -58,7 +58,7 @@ class DecayingDropout(Layer):
         }
 
         base_config = super(DecayingDropout, self).get_config()
-        return dict(list(base_config.item()) + list(config.item()))
+        return dict(list(base_config.items()) + list(config.items()))
 
     def _get_noise_shape(self, inputs):
         if self.noise_shape is None:

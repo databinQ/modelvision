@@ -98,6 +98,7 @@ class NLITaskTrain(object):
         self.model.compile(optimizer=self.current_optimizer,
                            loss="binary_crossentropy",
                            metrics=["acc"])
+        self.logger.set_model(self.model)
         logger.info("Switch to {} optimizer".format(self.current_optimizer))
 
     def evaluate(self, X=None, y=None, batch_size=None):
@@ -117,6 +118,7 @@ class NLITaskTrain(object):
         self.model.compile(optimizer=self.current_optimizer,
                            loss="binary_crossentropy",
                            metrics=["acc"])
+        self.logger.set_model(self.model)
         logger.info("Switch to {} optimizer".format(self.current_optimizer))
 
 
