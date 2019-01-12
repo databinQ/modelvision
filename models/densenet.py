@@ -17,7 +17,7 @@ class DenseNet(Model):
     def __init__(self, input_shape=None, include_top=True, input_tensor=None, depth=40, nb_dense_block=3,
                  nb_layers_per_block=-1, growth_rate=12, dropout_rate=0, compression=1.0, apply_batch_norm=False,
                  classes=10, activation="softmax", inputs=None, outputs=None, name="DenseNet"):
-        """https://arxiv.org/pdf/1608.06993.pdf
+        """https://arxiv.org/abs/1608.06993
 
         :param input_shape: optional shape tuple, only to be specified if `include_top` is False
         :param include_top: whether to include the fully-connected layer at the top of the network
