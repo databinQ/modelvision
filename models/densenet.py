@@ -21,7 +21,7 @@ class DenseNet(Model):
 
         :param input_shape: optional shape tuple, only to be specified if `include_top` is False
         :param include_top: whether to include the fully-connected layer at the top of the network
-        :param input_tensor: optional Keras tensor to use as image input for the model
+        :param input_tensor: optional keras tensor to use as image input for the model
         :param depth: number or layers in the DenseNet
         :param growth_rate: number of filters to add per dense block
         :param nb_dense_block: number of dense blocks to add to end (generally = 3)
