@@ -2,6 +2,15 @@
 
 import pickle
 import numpy as np
+# import tensorflow as tf
+# import keras.backend.tensorflow_backend as ktf
+#
+# config = tf.ConfigProto()
+# config.gpu_options.per_process_gpu_memory_fraction = 0.333
+# session = tf.Session(config=config)
+# ktf.set_session(session)
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "9"
 
 from models.transformer import Transformer
 
@@ -36,5 +45,26 @@ for i in range(dev_res.shape[0]):
     for j in range(dev_res.shape[1]):
         dev_res[i, j, y_dev[i, j + 1]] = 1
 model.summary()
-model.fit([x_train, y_train], train_res, batch_size=64, epochs=5,
-          validation_data=[[x_dev, y_dev], dev_res], shuffle=True, verbose=2)
+
+batch_size = 64
+num_train = len(x_train)
+batches_per_epoch = (num_train + batch_size - 1) // batch_size
+
+
+def batch_generator(X, Y, y):
+    while 1:
+        new_index = np.random.permutation(num_train)
+        for i in range(batches_per_epoch):
+            batch_index = new_index[i * batch_size: (i + 1) * batch_size]
+            yield [X[batch_index, :], Y[batch_index, :]], y[batch_index]
+
+
+model.fit_generator(generator=batch_generator(x_train, y_train, train_res),
+                    steps_per_epoch=batches_per_epoch,
+                    epochs=5,
+                    verbose=2,
+                    validation_data=[[x_dev, y_dev], dev_res],
+                    use_multiprocessing=False)
+
+# model.fit([x_train, y_train], train_res, batch_size=16, epochs=5,
+#           validation_data=[[x_dev, y_dev], dev_res], shuffle=True, verbose=2)
