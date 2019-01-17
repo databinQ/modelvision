@@ -26,5 +26,15 @@ y_dev[:, :Yvalid.shape[1]] = Yvalid
 model = Transformer(source_len=src_len, target_len=tar_len, scr_dict_size=len(dic1), tar_dict_size=len(dic2),
                     num_layers=1, use_pos_embedding=True, use_mask=True)
 model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["acc"])
-model.fit([x_train, y_train[:, :-1]], y_train[:, 1:], batch_size=64, epochs=5,
-          validation_data=[[x_dev, y_dev[:, :-1]], y_dev[:, 1:]], shuffle=True)
+
+train_res = np.zeros((y_train.shape[0], y_train.shape[1] - 1, len(dic2)), dtype=np.int32)
+dev_res = np.zeros((y_dev.shape[0], y_dev.shape[1] - 1, len(dic2)), dtype=np.int32)
+for i in range(train_res.shape[0]):
+    for j in range(train_res.shape[1]):
+        train_res[i, j, y_train[i, j + 1]] = 1
+for i in range(dev_res.shape[0]):
+    for j in range(dev_res.shape[1]):
+        dev_res[i, j, y_dev[i, j + 1]] = 1
+model.summary()
+model.fit([x_train, y_train], train_res, batch_size=64, epochs=5,
+          validation_data=[[x_dev, y_dev], dev_res], shuffle=True, verbose=2)

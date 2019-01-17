@@ -49,9 +49,7 @@ class Transformer(Model):
             source_in = position_embedding(source_in)
 
         encode_output = Encode(num_layers=self.num_layers, num_head=self.num_head, head_dim=self.head_dim,
-                               model_dim=self.model_dim, inner_dim=self.inner_dim)(source_in, seq_len=source_len)(
-            source_in, seq_len=source_len
-        )
+                               model_dim=self.model_dim, inner_dim=self.inner_dim)(source_in, seq_len=source_len)
 
         target_in = target_embedding(target_decode_in)
         if self.use_pos_embedding:
