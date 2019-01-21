@@ -2,7 +2,7 @@
 
 from keras import backend as K
 from keras.engine import Layer
-from keras.layers import Conv1D
+from keras.layers import Conv1D, Dropout, Add
 
 
 class PositionEmbedding(Layer):
@@ -34,12 +34,13 @@ class PositionEmbedding(Layer):
 
 
 class MultiHeadAttention(Layer):
-    def __init__(self, num_head, head_dim, model_dim, **kwargs):
+    def __init__(self, num_head, head_dim, model_dim, dropout, **kwargs):
         super(MultiHeadAttention, self).__init__(**kwargs)
         self.num_head = num_head
         self.head_dim = head_dim
         self.model_dim = model_dim
         self.output_dim = self.num_head * self.head_dim
+        self.dropout = dropout
 
     def build(self, input_shape):
         self.Q_weight = self.add_weight(name="Q_weight", shape=(input_shape[0][-1], self.output_dim),
@@ -52,11 +53,12 @@ class MultiHeadAttention(Layer):
                                         initializer="glorot_uniform", trainable=True)
         super(MultiHeadAttention, self).build(input_shape)
 
-    def call(self, inputs, mask=None, seq_len=None):
+    def call(self, inputs, masks=None):
         """
         Qs: (n, d_k)
         Ks: (m, d_k)
         Vs: (m, d_v)
+        masks: (n, m)
 
         - Q and K have the same state dimension, so using dot to calculate the influence of each step in Q and K
             sequence.
@@ -65,8 +67,6 @@ class MultiHeadAttention(Layer):
             Output matrix shape is (n, d_v)
         """
         Qs, Ks, Vs = inputs
-        if seq_len is not None:
-            Q_len, V_len = seq_len
         k_dim = K.shape(Qs)[-1]
 
         Qs = K.dot(Qs, self.Q_weight)  # (batch, n, model_dim)
@@ -81,18 +81,19 @@ class MultiHeadAttention(Layer):
 
         # compute dot
         A = K.batch_dot(Qs, Ks, axes=[3, 3]) / self.model_dim  # (batch, n_head, n, m)
-        A = K.permute_dimensions(A, (0, 3, 2, 1))  # (batch, m, n, n_head)
-        if seq_len is not None:
-            A = self.conduct_mask(A, V_len, method="add")
-        A = K.permute_dimensions(A, (0, 3, 2, 1))  # (batch, n_head, n, m)
+        A = K.permute_dimensions(A, (0, 2, 3, 1))  # (batch, n, m, n_head)
+        if masks is not None:
+            A = self.conduct_mask(A, masks, method="add")
+        A = K.permute_dimensions(A, (0, 3, 1, 2))  # (batch, n_head, n, m)
         A = K.softmax(A)
+        A = Dropout(self.dropout)(A)
 
         # compute output
         output = K.batch_dot(A, Vs, axes=[3, 2])  # (batch, n_head, n, head_dim)
         output = K.permute_dimensions(output, (0, 2, 1, 3))  # (batch, n, n_head, head_dim)
         output = K.reshape(output, shape=(-1, K.shape(output)[1], self.output_dim))  # (batch, n, n_head * head_dim)
-        if seq_len is not None:
-            output = self.conduct_mask(output, Q_len, method="mul")
+        # if masks is not None:
+        #     output = self.conduct_mask(output, masks, method="mul")
         output = K.dot(output, self.O_weight)  # (batch, n, model_dim)
         return output
 
@@ -100,12 +101,12 @@ class MultiHeadAttention(Layer):
         return tuple([input_shape[0][0], input_shape[0][1], self.output_dim])
 
     @staticmethod
-    def conduct_mask(inputs, seq_len, method="mul"):
-        # seq_len: (batch,)
-        mask = K.one_hot(seq_len, K.shape(inputs)[1])  # (batch, seq_len)
-        mask = 1 - K.cumsum(mask, axis=1)
-        for _ in range(len(inputs.shape) - 2):
-            mask = K.expand_dims(mask, -1)
+    def conduct_mask(inputs, masks, method="mul"):
+        """
+        inputs: (batch, m, n, n_head)
+        masks: (batch, m, n)
+        """
+        mask = K.expand_dims(masks, -1)  # (batch, m, n, 1)
 
         if method == "add":
             return inputs - (1 - mask) * 1e12
@@ -132,93 +133,96 @@ class LayerNormalization(Layer):
         return input_shape
 
 
-class PositionwiseFeedForward(Layer):
-    def __init__(self, inner_dim, **kwargs):
-        super(PositionwiseFeedForward, self).__init__(**kwargs)
+class PositionWiseFeedForward(object):
+    def __init__(self, inner_dim):
         self.inner_dim = inner_dim
 
-    def call(self, inputs, **kwargs):
+    def __call__(self, inputs):
         inner_output = Conv1D(self.inner_dim, 1, activation="relu")(inputs)
         output = Conv1D(int(inputs.shape[-1]), 1)(inner_output)
         return output
 
 
-class EncoderUnit(Layer):
-    def __init__(self, num_head, head_dim, model_dim, inner_dim, **kwargs):
-        super(EncoderUnit, self).__init__(**kwargs)
+class EncoderUnit(object):
+    def __init__(self, num_head, head_dim, model_dim, inner_dim, dropout):
         self.num_head = num_head
         self.head_dim = head_dim
         self.model_dim = model_dim
         self.inner_dim = inner_dim
+        self.dropout = dropout
 
-    def call(self, inputs, seq_len=None):
-        if seq_len is not None:
-            seq_lens = [seq_len, seq_len]
-        attn_output = MultiHeadAttention(num_head=self.num_head, head_dim=self.head_dim, model_dim=self.model_dim)(
-            [inputs, inputs, inputs], seq_len=seq_lens)
-        output1 = LayerNormalization()(attn_output + inputs)
-        feed_output = PositionwiseFeedForward(inner_dim=self.inner_dim)(output1)
-        output2 = LayerNormalization()(feed_output + output1)
+    def __call__(self, inputs, masks=None):
+        attn_output = MultiHeadAttention(num_head=self.num_head, head_dim=self.head_dim, model_dim=self.model_dim,
+                                         dropout=self.dropout)([inputs, inputs, inputs], masks=masks)
+        attn_output = Dropout(self.dropout)(attn_output)
+        output1 = Add()([attn_output, inputs])
+        output1 = LayerNormalization()(output1)
+        feed_output = PositionWiseFeedForward(inner_dim=self.inner_dim)(output1)
+        feed_output = Dropout(self.dropout)(feed_output)
+        output2 = Add()([feed_output, output1])
+        output2 = LayerNormalization()(output2)
         return output2
 
 
-class DecoderUnit(Layer):
-    def __init__(self, num_head, head_dim, model_dim, inner_dim, **kwargs):
-        super(DecoderUnit, self).__init__(**kwargs)
+class DecoderUnit(object):
+    def __init__(self, num_head, head_dim, model_dim, inner_dim, dropout):
         self.num_head = num_head
         self.head_dim = head_dim
         self.model_dim = model_dim
         self.inner_dim = inner_dim
+        self.dropout = dropout
 
-    def call(self, inputs, input_seq_len=None, output_seq_len=None):
-        encode_inputs, output_inputs = inputs
-        if input_seq_len is None or output_seq_len is None:
-            seq_lens1, seq_lens2 = None, None
-        else:
-            seq_lens1 = [output_seq_len, output_seq_len]
-            seq_lens2 = [output_seq_len, input_seq_len]
+    def __call__(self, inputs, self_mask=None, encode_mask=None):
+        encode_outputs, target_inputs = inputs
+
         output_attn_output = MultiHeadAttention(num_head=self.num_head, head_dim=self.head_dim,
-                                                model_dim=self.model_dim)([output_inputs, output_inputs, output_inputs],
-                                                                          seq_len=seq_lens1)
-        output1 = LayerNormalization()(output_attn_output + output_inputs)
+                                                model_dim=self.model_dim, dropout=self.dropout)(
+            [target_inputs, target_inputs, target_inputs], masks=self_mask)
+        output_attn_output = Dropout(self.dropout)(output_attn_output)
+        output1 = Add()([output_attn_output, target_inputs])
+        output1 = LayerNormalization()(output1)
         middle_attn_output = MultiHeadAttention(num_head=self.num_head, head_dim=self.head_dim,
-                                                model_dim=self.model_dim)([output1, encode_inputs, encode_inputs],
-                                                                          seq_len=seq_lens2)
-        output2 = LayerNormalization()(middle_attn_output + output1)
-        feed_output = PositionwiseFeedForward(inner_dim=self.inner_dim)(output1)
-        output3 = LayerNormalization()(feed_output + output2)
+                                                model_dim=self.model_dim, dropout=self.dropout)(
+            [output1, encode_outputs, encode_outputs], masks=encode_mask)
+        middle_attn_output = Dropout(self.dropout)(middle_attn_output)
+        output2 = Add()([middle_attn_output, output1])
+        output2 = LayerNormalization()(output2)
+        feed_output = PositionWiseFeedForward(inner_dim=self.inner_dim)(output2)
+        feed_output = Dropout(self.dropout)(feed_output)
+        output3 = Add()([feed_output, output2])
+        output3 = LayerNormalization()(output3)
         return output3
 
 
-class Encode(Layer):
-    def __init__(self, num_layers, num_head, head_dim, model_dim, inner_dim, **kwargs):
-        super(Encode, self).__init__(**kwargs)
+class Encode(object):
+    def __init__(self, num_layers, num_head, head_dim, model_dim, inner_dim, dropout):
         self.num_layers = num_layers
         self.num_head = num_head
         self.head_dim = head_dim
         self.model_dim = model_dim
         self.inner_dim = inner_dim
+        self.dropout = dropout
 
-    def call(self, inputs, seq_len=None):
+    def __call__(self, inputs, masks=None):
         for _ in range(self.num_layers):
             inputs = EncoderUnit(num_head=self.num_head, head_dim=self.head_dim, model_dim=self.model_dim,
-                                 inner_dim=self.inner_dim)(inputs, seq_len=seq_len)
+                                 inner_dim=self.inner_dim, dropout=self.dropout)(inputs, masks=masks)
         return inputs
 
 
-class Decode(Layer):
-    def __init__(self, num_layers, num_head, head_dim, model_dim, inner_dim, **kwargs):
-        super(Decode, self).__init__(**kwargs)
+class Decode(object):
+    def __init__(self, num_layers, num_head, head_dim, model_dim, inner_dim, dropout):
         self.num_layers = num_layers
         self.num_head = num_head
         self.head_dim = head_dim
         self.model_dim = model_dim
         self.inner_dim = inner_dim
+        self.dropout = dropout
 
-    def call(self, inputs, input_seq_len=None, output_seq_len=None):
+    def __call__(self, inputs, self_mask=None, encode_mask=None):
         outputs, encoder_outputs = inputs
         for _ in range(self.num_layers):
             outputs = DecoderUnit(num_head=self.num_head, head_dim=self.head_dim, model_dim=self.model_dim,
-                                  inner_dim=self.inner_dim)([encoder_outputs, outputs], input_seq_len=input_seq_len,
-                                                            output_seq_len=output_seq_len)
+                                  inner_dim=self.inner_dim, dropout=self.dropout)(
+                [encoder_outputs, outputs], self_mask=self_mask, encode_mask=encode_mask)
         return outputs

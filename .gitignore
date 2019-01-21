@@ -10,3 +10,7 @@ results/
 
 # others
 *.bat
+*.h5
+*.npy
+*.dict
+*.pkl
