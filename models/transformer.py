@@ -81,12 +81,11 @@ class Transformer(object):
             self.target_embedding = Embedding(input_dim=self.tar_dict_size, output_dim=self.model_dim)
 
         if self.use_pos_embedding:
-            self.position_embedding = PositionEmbedding()
+            self.position_embedding = PositionEmbedding(mode="sum")
 
         src_x = self.source_embedding(source_input)
         if self.use_pos_embedding:
-            src_pos_x = self.position_embedding(src_x)
-            src_x = Add()([src_x, src_pos_x])
+            src_x = self.position_embedding(src_x)
 
         src_x = Dropout(self.dropout)(src_x)
 
@@ -96,8 +95,7 @@ class Transformer(object):
 
         tar_x = self.target_embedding(target_decode_in)
         if self.use_pos_embedding:
-            tar_pos_x = self.position_embedding(tar_x)
-            tar_x = Add()([tar_x, tar_pos_x])
+            tar_x = self.position_embedding(tar_x)
 
         self.decoder = Decode(num_layers=self.num_layers, num_head=self.num_head, head_dim=self.head_dim,
                               model_dim=self.model_dim, inner_dim=self.inner_dim, dropout=self.dropout)
@@ -170,8 +168,7 @@ class Transformer(object):
 
         src_x = self.source_embedding(source_input)
         if self.use_pos_embedding:
-            src_pos_x = self.position_embedding(src_x)
-            src_x = Add()([src_x, src_pos_x])
+            src_x = self.position_embedding(src_x)
 
         encoder_output = self.encoder(src_x, masks=src_mask)
         self.encoder_model = Model([source_input], encoder_output)
@@ -187,8 +184,7 @@ class Transformer(object):
 
         tar_x = self.target_embedding(target_input)
         if self.use_pos_embedding:
-            tar_pos_x = self.position_embedding(tar_x)
-            tar_x = Add()([tar_x, tar_pos_x])
+            tar_x = self.position_embedding(tar_x)
 
         decoder_output = self.decoder([tar_x, encoder_output], self_mask=tar_mask, encode_mask=encode_mask)
         final_output = self.softmax(decoder_output)
@@ -264,7 +260,7 @@ class Transformer(object):
                 target_seq[new_k] = target_seq_bk[k]
                 target_seq[new_k, i + 1] = ind
                 topk_prob[new_k] = seq_p
-                decode_tokens.append(decode_tokens[k] + [ind])
+                decode_tokens.append(decode_tokens[k] + [self.tar_token_dict[ind]])
                 if ind == 3:
                     final_results.append((decode_tokens[k], seq_p))
 

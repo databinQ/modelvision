@@ -51,10 +51,10 @@ if __name__ == "__main__":
     model_saver = ModelCheckpoint("model/transformer.h5", save_weights_only=True, save_best_only=True)
     lr_scheduler = LRSchedulerPerBatch(dim_size=dim_size, warm_up=4000)
 
-    task = "test"
+    task = "train"
 
     if task == "train":
-        trans.model.fit([x_train, y_train], None, batch_size=64, epochs=30, validation_data=([x_dev, y_dev], None),
+        trans.model.fit([x_train, y_train], None, batch_size=64, epochs=25, validation_data=([x_dev, y_dev], None),
                         shuffle=True, verbose=1, callbacks=[lr_scheduler, model_saver])
     else:
         try:
@@ -62,7 +62,8 @@ if __name__ == "__main__":
         except OSError:
             print("Training new model")
 
-        seq_tokens = token_model.seq2tokens("Two young , White males are outside near many bushes .".split())
+        # seq_tokens = token_model.seq2tokens("Two young , White males are outside near many bushes .".split())
+        seq_tokens = token_model.seq2tokens("A black dog eats food .".split())
         decode_res = trans.decode(seq_tokens)
         decode_res1 = trans.decode_fast(seq_tokens)
         decode_res2 = trans.beam_search(seq_tokens, topk=5)
