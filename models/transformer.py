@@ -160,11 +160,8 @@ class Transformer(object):
 
     def _build_encoder(self):
         source_input = Input(shape=(None,), dtype="int32")
-        target_input = Input(shape=(None,), dtype="int32")
 
         src_mask = Lambda(lambda x: get_mask_seq2seq(x, x))(source_input)
-        tar_mask = Lambda(lambda x: self.get_self_mask(x))(target_input)
-        encode_mask = Lambda(lambda x: get_mask_seq2seq(x[0], x[1]))([target_input, source_input])
 
         src_x = self.source_embedding(source_input)
         if self.use_pos_embedding:

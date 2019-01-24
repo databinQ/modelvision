@@ -134,12 +134,15 @@ class LayerNormalization(Layer):
 
 
 class PositionWiseFeedForward(object):
-    def __init__(self, inner_dim):
+    def __init__(self, inner_dim, model_dim):
         self.inner_dim = inner_dim
+        self.model_dim = model_dim
+        self.conv1 = Conv1D(self.inner_dim, 1, activation="relu")
+        self.conv2 = Conv1D(self.model_dim, 1)
 
     def __call__(self, inputs):
-        inner_output = Conv1D(self.inner_dim, 1, activation="relu")(inputs)
-        output = Conv1D(int(inputs.shape[-1]), 1)(inner_output)
+        inner_output = self.conv1(inputs)
+        output = self.conv2(inner_output)
         return output
 
 
@@ -150,17 +153,23 @@ class EncoderUnit(object):
         self.model_dim = model_dim
         self.inner_dim = inner_dim
         self.dropout = dropout
+        self.multi_head = MultiHeadAttention(num_head=self.num_head, head_dim=self.head_dim, model_dim=self.model_dim,
+                                             dropout=self.dropout)
+        self.multi_head_dropout = Dropout(self.dropout)
+        self.multi_head_norm = LayerNormalization()
+        self.point_wise = PositionWiseFeedForward(inner_dim=self.inner_dim, model_dim=self.model_dim)
+        self.point_wise_dropout = Dropout(self.dropout)
+        self.point_wise_norm = LayerNormalization()
 
     def __call__(self, inputs, masks=None):
-        attn_output = MultiHeadAttention(num_head=self.num_head, head_dim=self.head_dim, model_dim=self.model_dim,
-                                         dropout=self.dropout)([inputs, inputs, inputs], masks=masks)
-        attn_output = Dropout(self.dropout)(attn_output)
+        attn_output = self.multi_head([inputs, inputs, inputs], masks=masks)
+        attn_output = self.multi_head_dropout(attn_output)
         output1 = Add()([attn_output, inputs])
-        output1 = LayerNormalization()(output1)
-        feed_output = PositionWiseFeedForward(inner_dim=self.inner_dim)(output1)
-        feed_output = Dropout(self.dropout)(feed_output)
+        output1 = self.multi_head_norm(output1)
+        feed_output = self.point_wise(output1)
+        feed_output = self.point_wise_dropout(feed_output)
         output2 = Add()([feed_output, output1])
-        output2 = LayerNormalization()(output2)
+        output2 = self.point_wise_norm(output2)
         return output2
 
 
@@ -171,26 +180,33 @@ class DecoderUnit(object):
         self.model_dim = model_dim
         self.inner_dim = inner_dim
         self.dropout = dropout
+        self.decode_multi_head = MultiHeadAttention(num_head=self.num_head, head_dim=self.head_dim,
+                                                    model_dim=self.model_dim, dropout=self.dropout)
+        self.decode_dropout = Dropout(self.dropout)
+        self.decode_norm = LayerNormalization()
+        self.encode_multi_head = MultiHeadAttention(num_head=self.num_head, head_dim=self.head_dim,
+                                                    model_dim=self.model_dim, dropout=self.dropout)
+        self.encode_dropout = Dropout(self.dropout)
+        self.encode_norm = LayerNormalization()
+        self.point_wise = PositionWiseFeedForward(inner_dim=self.inner_dim, model_dim=self.model_dim)
+        self.point_wise_dropout = Dropout(self.dropout)
+        self.point_wise_norm = LayerNormalization()
 
     def __call__(self, inputs, self_mask=None, encode_mask=None):
         encode_outputs, target_inputs = inputs
 
-        output_attn_output = MultiHeadAttention(num_head=self.num_head, head_dim=self.head_dim,
-                                                model_dim=self.model_dim, dropout=self.dropout)(
-            [target_inputs, target_inputs, target_inputs], masks=self_mask)
-        output_attn_output = Dropout(self.dropout)(output_attn_output)
+        output_attn_output = self.decode_multi_head([target_inputs, target_inputs, target_inputs], masks=self_mask)
+        output_attn_output = self.decode_dropout(output_attn_output)
         output1 = Add()([output_attn_output, target_inputs])
-        output1 = LayerNormalization()(output1)
-        middle_attn_output = MultiHeadAttention(num_head=self.num_head, head_dim=self.head_dim,
-                                                model_dim=self.model_dim, dropout=self.dropout)(
-            [output1, encode_outputs, encode_outputs], masks=encode_mask)
-        middle_attn_output = Dropout(self.dropout)(middle_attn_output)
+        output1 = self.decode_norm(output1)
+        middle_attn_output = self.encode_multi_head([output1, encode_outputs, encode_outputs], masks=encode_mask)
+        middle_attn_output = self.encode_dropout(middle_attn_output)
         output2 = Add()([middle_attn_output, output1])
-        output2 = LayerNormalization()(output2)
-        feed_output = PositionWiseFeedForward(inner_dim=self.inner_dim)(output2)
-        feed_output = Dropout(self.dropout)(feed_output)
+        output2 = self.encode_norm(output2)
+        feed_output = self.point_wise(output2)
+        feed_output = self.point_wise_dropout(feed_output)
         output3 = Add()([feed_output, output2])
-        output3 = LayerNormalization()(output3)
+        output3 = self.point_wise_norm(output3)
         return output3
 
 
@@ -202,11 +218,13 @@ class Encode(object):
         self.model_dim = model_dim
         self.inner_dim = inner_dim
         self.dropout = dropout
+        self.encode_layers = [EncoderUnit(num_head=self.num_head, head_dim=self.head_dim,
+                                          model_dim=self.model_dim, inner_dim=self.inner_dim,
+                                          dropout=self.dropout) for _ in range(self.num_layers)]
 
     def __call__(self, inputs, masks=None):
-        for _ in range(self.num_layers):
-            inputs = EncoderUnit(num_head=self.num_head, head_dim=self.head_dim, model_dim=self.model_dim,
-                                 inner_dim=self.inner_dim, dropout=self.dropout)(inputs, masks=masks)
+        for layer in self.encode_layers:
+            inputs = layer(inputs, masks=masks)
         return inputs
 
 
@@ -218,11 +236,12 @@ class Decode(object):
         self.model_dim = model_dim
         self.inner_dim = inner_dim
         self.dropout = dropout
+        self.decode_layers = [DecoderUnit(num_head=self.num_head, head_dim=self.head_dim,
+                                          model_dim=self.model_dim, inner_dim=self.inner_dim,
+                                          dropout=self.dropout) for _ in range(self.num_layers)]
 
     def __call__(self, inputs, self_mask=None, encode_mask=None):
         outputs, encoder_outputs = inputs
-        for _ in range(self.num_layers):
-            outputs = DecoderUnit(num_head=self.num_head, head_dim=self.head_dim, model_dim=self.model_dim,
-                                  inner_dim=self.inner_dim, dropout=self.dropout)(
-                [encoder_outputs, outputs], self_mask=self_mask, encode_mask=encode_mask)
+        for layer in self.decode_layers:
+            outputs = layer([encoder_outputs, outputs], self_mask=self_mask, encode_mask=encode_mask)
         return outputs

@@ -8,6 +8,9 @@ data/
 log/
 results/
 
+# file
+test.py
+
 # others
 *.bat
 *.h5

@@ -44,17 +44,17 @@ if __name__ == "__main__":
 
     dim_size = 512
     trans = Transformer(src_dict=src_dict, tar_dict=tar_dict, model_dim=dim_size, num_layers=2, num_head=8,
-                        length_limit=70, inner_dim=512, dropout=0.1, use_pos_embedding=True)
+                        length_limit=70, inner_dim=2048, dropout=0.1, use_pos_embedding=True)
     trans.compile(optimizer=Adam(0.001, 0.9, 0.98, epsilon=1e-9))
     trans.model.summary()
 
     model_saver = ModelCheckpoint("model/transformer.h5", save_weights_only=True, save_best_only=True)
     lr_scheduler = LRSchedulerPerBatch(dim_size=dim_size, warm_up=4000)
 
-    task = "train"
+    task = "test"
 
     if task == "train":
-        trans.model.fit([x_train, y_train], None, batch_size=64, epochs=25, validation_data=([x_dev, y_dev], None),
+        trans.model.fit([x_train, y_train], None, batch_size=64, epochs=30, validation_data=([x_dev, y_dev], None),
                         shuffle=True, verbose=1, callbacks=[lr_scheduler, model_saver])
     else:
         try:
