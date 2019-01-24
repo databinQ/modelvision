@@ -25,5 +25,7 @@ So far, following components have been implemented:
 - Model
     - [DenseNet](https://arxiv.org/abs/1608.06993) at `models.densenet`
     - [Densely Interactive Inference Network(DIIN)](https://openreview.net/forum?id=r1dHXnH6-&noteId=r1dHXnH6-) at `models.diin`
+    - [Transformer](Attention Is All You Need) at `models.tansformer`
 - Layer
     - DecayingDropout at `layers.dropout`
+    - [Transformer](Attention Is All You Need) at `layers.tansformer`
