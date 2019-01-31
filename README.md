@@ -29,3 +29,6 @@ So far, following components have been implemented:
 - Layer
     - DecayingDropout at `layers.dropout`
     - [Transformer](https://arxiv.org/abs/1706.03762) at `layers.tansformer`
+- Loss
+    - [Focal loss](https://arxiv.org/abs/1708.02002) at `losses.classify.focal_loss`
+    - [Robust category cross entropy](https://kexue.fm/archives/4493) at `losses.classify.robust_cross_entropy`
