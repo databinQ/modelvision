@@ -4,9 +4,10 @@ __pycache__/
 
 # folder
 .idea/
-data/
+dataset/
 log/
 results/
+test/
 
 # file
 test.py
