@@ -3,6 +3,7 @@
 import re
 import copy
 import codecs
+from tqdm import tqdm
 from collections import defaultdict
 
 
@@ -187,8 +188,11 @@ class Subwords(object):
             self.pair_stats[most_frequent] = 0
             self.prune_stats(threshold)
 
-    def process(self, texts):
-        return [self.process_single(text) for text in texts]
+    def process(self, seqs):
+        res = []
+        for text in tqdm(seqs):
+            res.append(self.process_single(text))
+        return res
 
     def process_single(self, tokens):
         res = tuple()

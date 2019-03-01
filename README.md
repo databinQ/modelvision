@@ -32,3 +32,5 @@ So far, following components have been implemented:
 - Loss
     - [Focal loss](https://arxiv.org/abs/1708.02002) at `losses.classify.focal_loss`
     - [Robust category cross entropy](https://kexue.fm/archives/4493) at `losses.classify.robust_cross_entropy`
+- NLP method
+    - [Subword](http://arxiv.org/abs/1508.07909) at `utils.subword`
